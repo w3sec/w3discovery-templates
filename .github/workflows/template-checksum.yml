@@ -1,0 +1,46 @@
+name: 📝 Template Checksum
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.yaml'
+  workflow_dispatch: # allows manual triggering of the workflow
+
+jobs:
+  checksum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with: 
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+
+      - name: install checksum generator
+        run: |
+          go install -v github.com/w3security/w3discovery/v2/cmd/generate-checksum@dev
+
+      - name: generate checksum
+        id: checksum
+        run: |
+          generate-checksum /home/runner/work/w3discovery-templates/w3discovery-templates/ templates-checksum.txt
+          git status -s | wc -l | xargs -I {} echo CHANGES={} >> $GITHUB_OUTPUT
+
+      - name: Commit files
+        if: steps.checksum.outputs.CHANGES > 0
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add templates-checksum.txt
+          git commit -am "Auto Generated Templates Checksum [$(date)] :robot:"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
